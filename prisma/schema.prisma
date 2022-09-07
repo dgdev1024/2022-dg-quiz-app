@@ -7,6 +7,53 @@ generator client {
   provider        = "prisma-client-js"
 }
 
+// model QuizQuestion {
+//   id            String    @id @default(auto()) @map("_id") @db.ObjectId
+//   quizId        String
+//   quiz          Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+//   body          String
+//   choices       String[]
+
+//   @@map("quizQuestions")
+// }
+
+type BatteryQuestion {
+  number    Int
+  choices   Int[]
+}
+
+type Battery {
+  quizId    String
+  questions BatteryQuestion[]
+}
+
+type QuizQuestion {
+  body      String
+  choices   String[]
+}
+
+model Quiz {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  authorId      String
+  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  dateCreated   DateTime  @default(now())
+  dateUpdated   DateTime  @default(now())
+
+  dateOpens     DateTime  @default(now())
+  dateCloses    DateTime?
+
+  private       Boolean   @default(true)
+
+  name          String
+  description   String
+  keywords      String[]
+  questions     QuizQuestion[]
+
+  @@map("quizzes")
+}
+
 model Account {
   id                 String  @id @default(auto()) @map("_id") @db.ObjectId
   userId             String
@@ -45,6 +92,8 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  quizzes       Quiz[]
+  batteries     Battery[]
   
   @@map("users")
 }

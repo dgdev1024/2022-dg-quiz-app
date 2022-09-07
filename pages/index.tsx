@@ -1,34 +1,43 @@
 /**
  * @file pages/index.tsx
  *
- * The application's home page.
+ * Presents the web application's home page.
  */
 
-import { unstable_getServerSession as getServerSession } from "next-auth/next";
+import Testbay from "@com/testbay";
+import type { GetServerSideProps } from "next";
+import { unstable_getServerSession as getServerSession } from "next-auth";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { authOptions } from "./api/auth/[...nextauth]";
-import { useSession, signIn, signOut } from "next-auth/react";
 
-function IndexPage(): JSX.Element {
+const IndexPage = () => {
   const { data: session } = useSession();
 
-  return session ? (
+  if (!session) {
+    return (
+      <>
+        <button onClick={() => signIn()}>Sign In</button>
+      </>
+    );
+  }
+
+  return (
     <>
-      <p>Signed in as '{session.user.email}'</p>
+      <Testbay />
       <button onClick={() => signOut()}>Sign Out</button>
     </>
-  ) : (
-    <>
-      <button onClick={() => signIn()}>Sign In</button>
-    </>
   );
-}
+};
 
-export async function getServerSideProps(context) {
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  console.log(session);
+
   return {
     props: {
-      session: await getServerSession(context.req, context.res, authOptions),
+      session,
     },
   };
-}
+};
 
 export default IndexPage;

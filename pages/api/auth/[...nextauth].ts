@@ -1,14 +1,18 @@
 /**
  * @file pages/api/auth/[...nextauth].ts
  *
- * Configuration of next-auth's authentication API endpoints.
+ * Configure's next-auth's authentication API routes.
  */
 
-import NextAuth, { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
+
+import NextAuth from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@lib/prisma";
 
+// Export the next-auth configuration options, for use with
+// 'unstable_getServerSession'.
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -26,10 +30,11 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async session({ session, user, token }) {
-      session.userId = user.id;
+      session.user.id = user.id;
       return session;
     },
   },
 };
 
+// Configure next-auth.
 export default NextAuth(authOptions);
