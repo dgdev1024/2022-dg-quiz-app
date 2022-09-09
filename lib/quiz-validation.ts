@@ -8,7 +8,9 @@ import { sanitizeHtmlString } from "./sanitize-html";
 // Source: https://stackoverflow.com/a/6053606/2868302
 // By Tudor Constantin on Stack Overflow
 // Licensed by CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/
-const nonAlphanumericRegex = /[^a-zA-Z\d\s.,!?:]/g;
+const nonAlphanumericRegex = /[^a-zA-Z\d\s.,!?:;]/g;
+
+const symbolsRegex = /[\.\,\;\:\!\?]/g;
 
 export const validateQuizName = (quizName: string): string => {
   const minimumLength = 10,
@@ -93,6 +95,10 @@ export const validateQuizQuestions = (
       issues.push(
         `${annotation}Question #${i + 1} contains non-alphanumeric characters.`
       );
+    }
+
+    if (question.choices.length < 5) {
+      issues.push(`Question #${i + 1} has fewer than five choices.`);
     }
 
     for (let j = 0; j < question.choices.length; ++j) {

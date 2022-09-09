@@ -19,6 +19,7 @@ export const TestPostQuizBody: PostQuizRequestBody = {
         "This is wrong answer 8",
         "This is wrong answer 9",
       ],
+      guid: "",
     },
     {
       body: "This is the second question",
@@ -34,6 +35,7 @@ export const TestPostQuizBody: PostQuizRequestBody = {
         "This is wrong answer 8",
         "This is wrong answer 9",
       ],
+      guid: "",
     },
     {
       body: "This is the third question",
@@ -49,6 +51,7 @@ export const TestPostQuizBody: PostQuizRequestBody = {
         "This is wrong answer 8",
         "This is wrong answer 9",
       ],
+      guid: "",
     },
   ],
 };
@@ -57,6 +60,7 @@ export const TestPutQuizBody: PutQuizRequestBody = {
   name: "The Edited Test Quiz From React",
   description: "This is the edited test quiz from React. Does it still work?",
   private: false,
+  batteryCount: 50,
   questions: [
     {
       body: "This is the first question",
@@ -72,6 +76,7 @@ export const TestPutQuizBody: PutQuizRequestBody = {
         "This is wrong answer 8",
         "This is wrong answer 9",
       ],
+      guid: "",
     },
     {
       body: "This is the edited second question",
@@ -88,6 +93,7 @@ export const TestPutQuizBody: PutQuizRequestBody = {
         "This is wrong answer 9",
         "This is wrong answer 10",
       ],
+      guid: "",
     },
     {
       body: "This is the edited third question",
@@ -101,6 +107,7 @@ export const TestPutQuizBody: PutQuizRequestBody = {
         "This is wrong answer 8",
         "This is wrong answer 9",
       ],
+      guid: "",
     },
   ],
 };

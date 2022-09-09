@@ -12,7 +12,13 @@ export type UserUpdateData = {
 export type QuizQuestion = {
   body: string;
   choices: string[];
-  id?: string;
+  guid: string;
+};
+
+/** The type of the battery question. Used by the /api/battery endpoints. */
+export type BatteryQuestion = {
+  id: string;
+  choices: number[];
 };
 
 /** The type of the request body used by the POST method function. */
@@ -24,6 +30,7 @@ export type PostQuizRequestBody = {
   dateOpens?: Date;
   dateCloses?: Date | null;
   questions: QuizQuestion[];
+  batteryCount?: number;
 };
 
 /** The type of the request body used by the PUT method function. */
@@ -35,6 +42,7 @@ export type PutQuizRequestBody = {
   dateOpens?: Date;
   dateCloses?: Date | null;
   questions: QuizQuestion[];
+  batteryCount: number;
 };
 
 /** The type of the response returned by the GET method function. */
@@ -43,12 +51,14 @@ export type GetQuizResponseBody = {
     isAuthor: boolean;
     name: string;
     description: string;
+    version: number;
     keywords: string[];
     dateCreated: Date;
     dateUpdated: Date;
     dateOpens: Date;
     dateCloses?: Date | null;
     questions?: QuizQuestion[];
+    batteryCount: number;
   };
   error?: string;
 };
@@ -105,4 +115,27 @@ export type SearchQuizResponseBody = {
   page?: number;
   lastPage?: boolean;
   error?: string;
+};
+
+/** The type of the response body returned by POST /api/battery. */
+export type RequestBatteryResponseBody = {
+  id?: string;
+  quizId?: string;
+  quizVersion?: number;
+  questions?: BatteryQuestion[];
+  complete?: boolean;
+  correct?: number;
+  error?: string;
+};
+
+/** The type of the response body returned by GET /api/battery. */
+export type ResolveBatteryResponseBody = {
+  error?: string;
+  name?: string;
+  description?: string;
+  questions?: QuizQuestion[];
+  outdated?: boolean;
+  complete?: boolean;
+  correct?: number;
+  open?: boolean;
 };

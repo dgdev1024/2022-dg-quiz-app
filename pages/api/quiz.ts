@@ -2,6 +2,7 @@
  * @file api/quiz.ts
  */
 
+import * as uuid from "uuid";
 import { NextApiRequest, NextApiResponse } from "next";
 import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "./auth/[...nextauth]";
@@ -56,12 +57,14 @@ const methods = {
           isAuthor,
           name: getQuiz.name,
           description: getQuiz.description,
+          version: getQuiz.version,
           keywords: getQuiz.keywords,
           dateCreated: getQuiz.dateCreated,
           dateUpdated: getQuiz.dateUpdated,
           dateOpens: getQuiz.dateOpens,
           dateCloses: getQuiz.dateCloses,
           questions: isAuthor === true ? getQuiz.questions : [],
+          batteryCount: getQuiz.batteryCount,
         },
       };
 
@@ -119,6 +122,12 @@ const methods = {
         ]),
       ];
 
+      // Assign GUIDs to the new quiz's questions.
+      quiz.questions = quiz.questions.map((question) => ({
+        ...question,
+        guid: uuid.v4(),
+      }));
+
       // Upload the quiz.
       const postedQuiz = await prisma.quiz.create({
         data: {
@@ -159,6 +168,7 @@ const methods = {
 
       // Grab the details of the edited quiz from the request body.
       const editedQuiz = req.body as PutQuizRequestBody;
+      console.log(editedQuiz);
 
       // Validate the quiz's input.
       const issues: string[] = [
@@ -196,7 +206,13 @@ const methods = {
       // Fetch the quiz and get its author ID.
       const fetchedQuiz = await prisma.quiz.findUnique({
         where: { id: quizId },
-        select: { authorId: true, dateOpens: true, dateCloses: true },
+        select: {
+          authorId: true,
+          dateOpens: true,
+          dateCloses: true,
+          version: true,
+          batteryCount: true,
+        },
       });
 
       // Make sure the quiz is present...
@@ -227,6 +243,26 @@ const methods = {
         }
       }
 
+      // Check to see if new questions were added to the quiz. New questions will have no
+      // GUID assigned to them.
+      let hasNewQuestions = editedQuiz.questions.some(
+        (question) => question.guid === ""
+      );
+
+      // If there are new questions in this quiz, then assign new GUIDs to them.
+      if (hasNewQuestions === true) {
+        editedQuiz.questions = editedQuiz.questions.map((question) => {
+          if (question.guid === "") {
+            return question;
+          } else {
+            hasNewQuestions = true;
+            return { ...question, guid: uuid.v4() };
+          }
+        });
+      }
+
+      console.log(editedQuiz.questions);
+
       // Update the quiz and questions in the database.
       const updatedQuiz = await prisma.quiz.update({
         where: { id: quizId },
@@ -236,6 +272,11 @@ const methods = {
           keywords: keywordSet,
           dateUpdated: new Date(),
           questions: editedQuiz.questions,
+          version:
+            hasNewQuestions === true ||
+            editedQuiz.batteryCount !== fetchedQuiz.batteryCount
+              ? fetchedQuiz.version + 1
+              : fetchedQuiz.version,
         },
       });
 

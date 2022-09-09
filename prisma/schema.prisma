@@ -19,16 +19,21 @@ generator client {
 // }
 
 type BatteryQuestion {
-  number    Int
+  id        String
   choices   Int[]
 }
 
 type Battery {
-  quizId    String
-  questions BatteryQuestion[]
+  id            String
+  quizId        String
+  quizVersion   Int
+  questions     BatteryQuestion[]
+  complete      Boolean       @default(false)
+  correct       Int?
 }
 
 type QuizQuestion {
+  guid      String
   body      String
   choices   String[]
 }
@@ -46,10 +51,14 @@ model Quiz {
 
   private       Boolean   @default(true)
 
+  version       Int       @default(1)
+
   name          String
   description   String
   keywords      String[]
   questions     QuizQuestion[]
+
+  batteryCount  Int       @default(50)
 
   @@map("quizzes")
 }
