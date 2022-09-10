@@ -28,6 +28,7 @@ type Battery {
   quizId        String
   quizVersion   Int
   questions     BatteryQuestion[]
+  answers       Int[]
   complete      Boolean       @default(false)
   correct       Int?
 }

@@ -1,4 +1,8 @@
-import { PostQuizRequestBody, PutQuizRequestBody } from "types/quiz-app-types";
+import {
+  PostQuizRequestBody,
+  PutQuizRequestBody,
+  SubmitBatteryRequestBody,
+} from "types/quiz-app-types";
 
 export const TestPostQuizBody: PostQuizRequestBody = {
   name: "The Test Quiz From React",
@@ -54,6 +58,10 @@ export const TestPostQuizBody: PostQuizRequestBody = {
       guid: "",
     },
   ],
+};
+
+export const TestSubmitBatteryBody: SubmitBatteryRequestBody = {
+  answers: [1, 2, 3],
 };
 
 export const TestPutQuizBody: PutQuizRequestBody = {

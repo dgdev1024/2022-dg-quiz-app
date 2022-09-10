@@ -98,6 +98,11 @@ export type SearchQuizRequestBody = {
   page: number;
 };
 
+/** The type of the request body passed into PUT /api/battery */
+export type SubmitBatteryRequestBody = {
+  answers: number[];
+};
+
 /**
  * The type of the response returned by GET /api/search.
  */
@@ -134,8 +139,18 @@ export type ResolveBatteryResponseBody = {
   name?: string;
   description?: string;
   questions?: QuizQuestion[];
+  answers?: number[];
   outdated?: boolean;
   complete?: boolean;
   correct?: number;
   open?: boolean;
+};
+
+/** The type of the response body returned by PUT /api/battery */
+export type SubmitBatteryResponseBody = {
+  error?: string;
+  correct?: number;
+  possible?: number;
+  percent?: number;
+  complete?: boolean;
 };

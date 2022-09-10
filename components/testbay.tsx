@@ -3,7 +3,11 @@
  */
 
 import { useState } from "react";
-import { TestPostQuizBody, TestPutQuizBody } from "@lib/testing";
+import {
+  TestPostQuizBody,
+  TestPutQuizBody,
+  TestSubmitBatteryBody,
+} from "@lib/testing";
 import {
   DeleteQuizResponseBody,
   GetQuizResponseBody,
@@ -12,6 +16,7 @@ import {
   RequestBatteryResponseBody,
   ResolveBatteryResponseBody,
   SearchQuizResponseBody,
+  SubmitBatteryResponseBody,
 } from "types/quiz-app-types";
 
 const Testbay = () => {
@@ -30,6 +35,9 @@ const Testbay = () => {
     useState<RequestBatteryResponseBody | null>(null);
   const [resolveBatteryResponse, setResolveBatteryResponse] =
     useState<ResolveBatteryResponseBody | null>(null);
+
+  const [submitBatteryResponse, setSubmitBatteryResponse] =
+    useState<SubmitBatteryResponseBody | null>(null);
 
   const onPostClicked = async () => {
     const res = await fetch("/api/quiz", {
@@ -98,6 +106,17 @@ const Testbay = () => {
     setResolveBatteryResponse(data);
   };
 
+  const onSubmitBatteryClicked = async () => {
+    const res = await fetch(`/api/battery?id=${requestBatteryResponse?.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(TestSubmitBatteryBody),
+    });
+    const data = await res.json();
+
+    setSubmitBatteryResponse(data);
+  };
+
   return (
     <>
       <div>
@@ -131,16 +150,32 @@ const Testbay = () => {
               )}
             </div>
             {requestBatteryResponse && (
-              <div>
-                <button onClick={onResolveBatteryClicked}>
-                  Resolve Quiz Battery
-                </button>
-                {resolveBatteryResponse && (
-                  <code>
-                    <pre>{JSON.stringify(resolveBatteryResponse, null, 2)}</pre>
-                  </code>
-                )}
-              </div>
+              <>
+                <div>
+                  <button onClick={onResolveBatteryClicked}>
+                    Resolve Quiz Battery
+                  </button>
+                  {resolveBatteryResponse && (
+                    <code>
+                      <pre>
+                        {JSON.stringify(resolveBatteryResponse, null, 2)}
+                      </pre>
+                    </code>
+                  )}
+                </div>
+                <div>
+                  <button onClick={onSubmitBatteryClicked}>
+                    Submit Quiz Battery
+                  </button>
+                  {submitBatteryResponse && (
+                    <code>
+                      <pre>
+                        {JSON.stringify(submitBatteryResponse, null, 2)}
+                      </pre>
+                    </code>
+                  )}
+                </div>
+              </>
             )}
           </>
         )}

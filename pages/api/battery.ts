@@ -9,9 +9,10 @@ import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "@api/auth/[...nextauth]";
 import { prisma } from "@lib/prisma";
 import {
-  QuizQuestion,
   RequestBatteryResponseBody,
   ResolveBatteryResponseBody,
+  SubmitBatteryRequestBody,
+  SubmitBatteryResponseBody,
 } from "types/quiz-app-types";
 import { Battery, Quiz } from "@prisma/client";
 import { getRandomInclusiveInt } from "@lib/random";
@@ -56,6 +57,7 @@ const generateQuizBattery = (fromQuiz: Quiz): Battery => {
     quizId: fromQuiz.id,
     quizVersion: fromQuiz.version,
     questions: [],
+    answers: [],
     complete: false,
     correct: -1,
   };
@@ -115,6 +117,9 @@ const generateQuizBattery = (fromQuiz: Quiz): Battery => {
       choices: selectedChoices,
     });
 
+    // Also insert a null answer into the answers array.
+    returnBattery.answers.push(-1);
+
     // Now splice the question with the generated index from the question bank,
     // so that it cannot be selected again in future iterations of this loop.
     questionBank.splice(randomIndex, 1);
@@ -131,6 +136,7 @@ const resolveQuizBattery = (
     name: fromQuiz.name,
     description: fromQuiz.description,
     questions: [],
+    answers: fromBattery.answers,
     outdated: false,
     complete: fromBattery.complete,
     correct: fromBattery.correct as number,
@@ -322,6 +328,139 @@ const methods = {
         .json({ error: "Something went wrong. Try again later." });
     }
   },
+
+  async put(
+    req: NextApiRequest,
+    res: NextApiResponse<SubmitBatteryResponseBody>
+  ) {
+    // Make sure our author is logged in.
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) {
+      return res.status(401).json({ error: "You are not logged in." });
+    }
+
+    try {
+      // First and foremost, we will need to fetch the logged-in user in order to get
+      // that user's quiz batteries.
+      const fetchedUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { batteries: true },
+      });
+      if (!fetchedUser) {
+        // The user should exist. If it doesn't, then throw.
+        throw new Error(
+          "Expected the logged-in user to be present in the database, but did not find one!"
+        );
+      }
+
+      // Get the ID of the battery to fetch.
+      const batteryId = req.query?.id as string;
+      if (!batteryId || batteryId === "undefined") {
+        return res.status(404).json({ error: "Please provide a battery ID." });
+      }
+
+      // Find the battery in the fetched user object.
+      const fetchedBatteryIndex = fetchedUser.batteries.findIndex(
+        (battery) => battery.id === batteryId
+      );
+      if (fetchedBatteryIndex === -1) {
+        return res.status(404).json({ error: "Battery not found." });
+      }
+      const fetchedBattery = fetchedUser.batteries[fetchedBatteryIndex];
+
+      // Make sure the user hasn't already completed this battery.
+      if (fetchedBattery.complete === true) {
+        return res
+          .status(409)
+          .json({ error: "This battery has already been completed." });
+      }
+
+      // Fetch the quiz for which this battery was generated.
+      const fetchedQuiz = await prisma.quiz.findUnique({
+        where: { id: fetchedBattery.quizId },
+      });
+      if (!fetchedQuiz) {
+        return res.status(404).json({ error: "Quiz not found." });
+      }
+
+      // Make sure this battery is not out of date.
+      if (fetchedBattery.quizVersion !== fetchedQuiz.version) {
+        return res
+          .status(409)
+          .json({
+            error:
+              "This quiz battery is from an outdated version of the quiz. Request a new quiz battery.",
+          });
+      }
+
+      // Make sure the quiz is still open.
+      const openStatusString = checkQuizDateRange(
+        fetchedQuiz.dateOpens,
+        fetchedQuiz.dateCloses
+      );
+      if (openStatusString !== "") {
+        return res.status(403).json({ error: openStatusString });
+      }
+
+      // Get the array of answers submitted by the user.
+      const body = req.body as SubmitBatteryRequestBody;
+
+      // Since there are only five choices per question, the answers found in the array in
+      // the request body above should be represented by only the numbers zero through four
+      // (arrays are base-zero). That said, filter out any elements in this array which
+      // are null/undefined, or are out of the range of zero to four.
+      const answers = body.answers.filter(
+        (id) => typeof id === "number" && id >= 0 && id <= 4
+      );
+
+      // Update the answers array found in the user's batteries array.
+      fetchedUser.batteries[fetchedBatteryIndex].answers = answers;
+
+      // Check to see if the filtered answers array has the same number of elements as in
+      // the battery questions array. If so, then the battery has been completed.
+      const isComplete: boolean =
+        answers.length === fetchedBattery.questions.length;
+      let correct: number = 0;
+      if (isComplete === true) {
+        // Grade the submission.
+        for (let i = 0; i < answers.length; ++i) {
+          const question = fetchedBattery.questions[i];
+          const answerIndex = answers[i];
+
+          if (question.choices[answerIndex] === 0) {
+            correct++;
+          }
+        }
+
+        // Update the user to reflect the newly-completed battery.
+        fetchedUser.batteries[fetchedBatteryIndex].complete = true;
+        fetchedUser.batteries[fetchedBatteryIndex].correct = correct;
+      }
+
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: {
+          batteries: fetchedUser.batteries,
+        },
+      });
+
+      // Return the grade in the response body.
+      return res.status(200).json({
+        correct: isComplete === true ? correct : -1,
+        possible: fetchedBattery.questions.length,
+        percent:
+          isComplete === true
+            ? (correct / fetchedBattery.questions.length) * 100
+            : -1,
+        complete: isComplete,
+      });
+    } catch (err) {
+      console.error("PUT /api/battery:", err);
+      return res
+        .status(500)
+        .json({ error: "Something went wrong. Try again later." });
+    }
+  },
 };
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -330,6 +469,8 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
       return await methods.post(req, res);
     case "GET":
       return await methods.get(req, res);
+    case "PUT":
+      return await methods.put(req, res);
   }
 
   return res.status(405).json({ error: "This method is not allowed." });

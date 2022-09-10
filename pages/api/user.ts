@@ -56,6 +56,29 @@ const methods = {
         return res.status(404).json({ error: "No user exists with this ID." });
       }
 
+      // If the user being fetched is the logged-in user, then calculate their grade
+      // based on their completed quiz batteries.
+      const isSelf = getUser.id === session.user.id;
+      let completedBatteriesCount: number = 0;
+      let currentGrade: number = 0;
+      if (isSelf === true) {
+        const completedBatteries = getUser.batteries.filter(
+          (battery) => battery.complete === true && battery.correct !== null
+        );
+
+        completedBatteriesCount = completedBatteries.length;
+        if (completedBatteriesCount > 0) {
+          currentGrade =
+            completedBatteries.reduce((correct, battery) => {
+              if (battery.correct === null) {
+                return correct;
+              }
+
+              return correct + battery.correct;
+            }, 0) / completedBatteriesCount;
+        }
+      }
+
       // Return the user's details and quizzes in the response.
       return res.status(200).json({
         user: {
@@ -64,7 +87,9 @@ const methods = {
           image: getUser.image,
           emailAddress: getUser.email,
           quizzes: getUser.quizzes.slice(10),
-          isSelf: getUser.id === session.user.id,
+          completedBatteriesCount: isSelf && completedBatteriesCount,
+          currentGrade: isSelf && currentGrade,
+          isSelf,
         },
       });
     } catch (err) {
