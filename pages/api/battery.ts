@@ -9,6 +9,7 @@ import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "@api/auth/[...nextauth]";
 import { prisma } from "@lib/prisma";
 import {
+  GeneratedBattery,
   RequestBatteryResponseBody,
   ResolveBatteryResponseBody,
   SubmitBatteryRequestBody,
@@ -50,10 +51,9 @@ const checkQuizDateRange = (
  * @param fromQuiz The quiz to generate the battery from.
  * @returns The generated battery.
  */
-const generateQuizBattery = (fromQuiz: Quiz): Battery => {
+const generateQuizBattery = (fromQuiz: Quiz): GeneratedBattery => {
   // Create the battery object to be returned.
-  const returnBattery: Battery = {
-    id: uuid.v4(),
+  const returnBattery: GeneratedBattery = {
     quizId: fromQuiz.id,
     quizVersion: fromQuiz.version,
     questions: [],
@@ -128,36 +128,60 @@ const generateQuizBattery = (fromQuiz: Quiz): Battery => {
   return returnBattery;
 };
 
+/**
+ * Attempts to resolve the questions in a quiz battery to questions found in its
+ * associated quiz.
+ *
+ * @param fromBattery The battery whose questions are to be resolved.
+ * @param fromQuiz The quiz to resolve the battery questions with.
+ * @returns The resolved battery in a response body.
+ */
 const resolveQuizBattery = (
   fromBattery: Battery,
   fromQuiz: Quiz
 ): ResolveBatteryResponseBody => {
-  const resolvedBattery: ResolveBatteryResponseBody = {
-    name: fromQuiz.name,
-    description: fromQuiz.description,
-    questions: [],
-    answers: fromBattery.answers,
-    outdated: false,
-    complete: fromBattery.complete,
-    correct: fromBattery.correct as number,
-    open: checkQuizDateRange(fromQuiz.dateOpens, fromQuiz.dateCloses) === "",
+  // Construct the response body from what we already know of the quiz.
+  const resolved: ResolveBatteryResponseBody = {
+    battery: {
+      name: fromQuiz.name,
+      description: fromQuiz.description,
+      questions: [],
+      answers: fromBattery.answers,
+      outdated: false,
+      complete: fromBattery.complete,
+      correct: fromBattery.correct as number,
+      open: checkQuizDateRange(fromQuiz.dateOpens, fromQuiz.dateCloses) === "",
+    },
   };
 
-  if (fromBattery.quizVersion < fromQuiz.version) {
-    resolvedBattery.outdated = true;
-    return resolvedBattery;
+  // "Object is possibly undefined"
+  if (!resolved.battery) {
+    return resolved;
   }
 
+  // First, check to see if this quiz battery is outdated - the version of the quiz
+  // the battery was generated from is older than the quiz is today.
+  if (fromBattery.quizVersion < fromQuiz.version) {
+    resolved.battery.outdated = true;
+    return resolved;
+  }
+
+  // Iterate over the questions found in the battery questions array.
   for (const batteryQuestion of fromBattery.questions) {
+    // The battery question should have a GUID that coresponds to one of the questions
+    // found in the quiz. Find that question.
     const quizQuestion = fromQuiz.questions.find(
       (question) => question.guid === batteryQuestion.id
     );
 
+    // That question must exist in the quiz because we established that the battery's
+    // quiz version and the source quiz version are the same. If it isn't, that's an
+    // exception.
     if (!quizQuestion) {
       throw new Error("Failed to resolve battery question!");
     }
 
-    resolvedBattery.questions?.push({
+    resolved.battery.questions.push({
       guid: quizQuestion.guid,
       body: quizQuestion.body,
       choices: batteryQuestion.choices.map(
@@ -166,7 +190,7 @@ const resolveQuizBattery = (
     });
   }
 
-  return resolvedBattery;
+  return resolved;
 };
 
 const methods = {
@@ -218,51 +242,81 @@ const methods = {
       }
 
       // First, check to see if the user already has a battery for this quiz.
-      const { batteries } = fetchedUser;
-      const existingBatteryIndex = batteries.findIndex(
-        (battery) => battery.quizId === fetchedQuiz.id
-      );
+      // const { batteries } = fetchedUser;
+      // const existingBatteryIndex = batteries.findIndex(
+      //   (battery) => battery.quizId === fetchedQuiz.id
+      // );
 
-      if (existingBatteryIndex !== -1) {
+      const existingBattery = await prisma.battery.findFirst({
+        where: {
+          userId: session.user.id,
+          quizId: fetchedQuiz.id,
+        },
+      });
+
+      if (existingBattery) {
         // Check to see if the battery was from the current version of the fetched quiz.
-        const battery = batteries[existingBatteryIndex];
-        if (battery.quizVersion === fetchedQuiz.version) {
+        if (existingBattery.quizVersion === fetchedQuiz.version) {
           const { id, quizId, quizVersion, questions, complete, correct } =
-            battery;
+            existingBattery;
 
-          return res.status(200).json({
-            id,
-            quizId,
-            quizVersion,
-            questions,
-            complete,
-            correct: (complete ? correct : -1) as number,
-          });
+          const response: RequestBatteryResponseBody = {
+            battery: {
+              id,
+              quizId,
+              quizVersion,
+              questions,
+              complete,
+            },
+          };
+
+          if (response.battery && correct) {
+            response.battery.correct = correct;
+          }
+
+          return res.status(200).json(response);
         } else {
           // If a new version of the quiz is available, then remove the old
           // battery before creating a new battery.
-          batteries.splice(existingBatteryIndex, 1);
+          await prisma.battery.deleteMany({
+            where: {
+              userId: session.user.id,
+              quizId: fetchedQuiz.id,
+            },
+          });
         }
       }
 
       // Generate a new quiz battery and push it into the user's batteries array.
       const newBattery = generateQuizBattery(fetchedQuiz);
-      batteries.push(newBattery);
+      // batteries.push(newBattery);
 
-      await prisma.user.update({
-        where: { id: session.user.id },
+      // await prisma.user.update({
+      //   where: { id: session.user.id },
+      //   data: {
+      //     batteries,
+      //   },
+      // });
+
+      const insertedBattery = await prisma.battery.create({
         data: {
-          batteries,
+          userId: session.user.id,
+          quizId: fetchedQuiz.id,
+          quizVersion: fetchedQuiz.version,
+          questions: newBattery.questions,
+          answers: newBattery.questions.map((_) => -1),
+          correct: -1,
         },
       });
 
       return res.status(201).json({
-        id: newBattery.id,
-        quizId: newBattery.quizId,
-        quizVersion: newBattery.quizVersion,
-        questions: newBattery.questions,
-        complete: newBattery.complete,
-        correct: newBattery.correct as number,
+        battery: {
+          id: insertedBattery.id,
+          quizId: insertedBattery.quizId,
+          quizVersion: insertedBattery.quizVersion,
+          questions: insertedBattery.questions,
+          complete: insertedBattery.complete,
+        },
       });
     } catch (err) {
       console.error(`POST /api/battery: ${err}`);
@@ -283,29 +337,20 @@ const methods = {
     }
 
     try {
-      // First and foremost, we will need to fetch the logged-in user in order to get
-      // that user's quiz batteries.
-      const fetchedUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { batteries: true },
-      });
-      if (!fetchedUser) {
-        // The user should exist. If it doesn't, then throw.
-        throw new Error(
-          "Expected the logged-in user to be present in the database, but did not find one!"
-        );
-      }
-
       // Get the ID of the battery to fetch.
-      const batteryId = req.query?.id as string;
-      if (!batteryId || batteryId === "undefined") {
+      const batteryId = req.query?.id;
+      if (!batteryId || typeof batteryId !== "string") {
         return res.status(404).json({ error: "Please provide a battery ID." });
       }
 
-      // Find the battery in the fetched user object.
-      const fetchedBattery = fetchedUser.batteries.find(
-        (battery) => battery.id === batteryId
-      );
+      // Find the battery with the given ID.
+      // const fetchedBattery = fetchedUser.batteries.find(
+      //   (battery) => battery.id === batteryId
+      // );
+
+      const fetchedBattery = await prisma.battery.findUnique({
+        where: { id: batteryId },
+      });
       if (!fetchedBattery) {
         return res.status(404).json({ error: "Battery not found." });
       }
@@ -340,33 +385,27 @@ const methods = {
     }
 
     try {
-      // First and foremost, we will need to fetch the logged-in user in order to get
-      // that user's quiz batteries.
-      const fetchedUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { batteries: true },
-      });
-      if (!fetchedUser) {
-        // The user should exist. If it doesn't, then throw.
-        throw new Error(
-          "Expected the logged-in user to be present in the database, but did not find one!"
-        );
-      }
-
       // Get the ID of the battery to fetch.
-      const batteryId = req.query?.id as string;
-      if (!batteryId || batteryId === "undefined") {
+      const batteryId = req.query?.id;
+      if (!batteryId || typeof batteryId !== "string") {
         return res.status(404).json({ error: "Please provide a battery ID." });
       }
 
       // Find the battery in the fetched user object.
-      const fetchedBatteryIndex = fetchedUser.batteries.findIndex(
-        (battery) => battery.id === batteryId
-      );
-      if (fetchedBatteryIndex === -1) {
+      // const fetchedBatteryIndex = fetchedUser.batteries.findIndex(
+      //   (battery) => battery.id === batteryId
+      // );
+      // if (fetchedBatteryIndex === -1) {
+      //   return res.status(404).json({ error: "Battery not found." });
+      // }
+      // const fetchedBattery = fetchedUser.batteries[fetchedBatteryIndex];
+
+      const fetchedBattery = await prisma.battery.findUnique({
+        where: { id: batteryId },
+      });
+      if (!fetchedBattery) {
         return res.status(404).json({ error: "Battery not found." });
       }
-      const fetchedBattery = fetchedUser.batteries[fetchedBatteryIndex];
 
       // Make sure the user hasn't already completed this battery.
       if (fetchedBattery.complete === true) {
@@ -385,12 +424,10 @@ const methods = {
 
       // Make sure this battery is not out of date.
       if (fetchedBattery.quizVersion !== fetchedQuiz.version) {
-        return res
-          .status(409)
-          .json({
-            error:
-              "This quiz battery is from an outdated version of the quiz. Request a new quiz battery.",
-          });
+        return res.status(409).json({
+          error:
+            "This quiz battery is from an outdated version of the quiz. Request a new quiz battery.",
+        });
       }
 
       // Make sure the quiz is still open.
@@ -403,7 +440,7 @@ const methods = {
       }
 
       // Get the array of answers submitted by the user.
-      const body = req.body as SubmitBatteryRequestBody;
+      const body: SubmitBatteryRequestBody = req.body;
 
       // Since there are only five choices per question, the answers found in the array in
       // the request body above should be represented by only the numbers zero through four
@@ -413,8 +450,8 @@ const methods = {
         (id) => typeof id === "number" && id >= 0 && id <= 4
       );
 
-      // Update the answers array found in the user's batteries array.
-      fetchedUser.batteries[fetchedBatteryIndex].answers = answers;
+      // Update the answers array found in the fetched battery.
+      fetchedBattery.answers = answers;
 
       // Check to see if the filtered answers array has the same number of elements as in
       // the battery questions array. If so, then the battery has been completed.
@@ -433,24 +470,34 @@ const methods = {
         }
 
         // Update the user to reflect the newly-completed battery.
-        fetchedUser.batteries[fetchedBatteryIndex].complete = true;
-        fetchedUser.batteries[fetchedBatteryIndex].correct = correct;
+        fetchedBattery.complete = true;
+        fetchedBattery.correct = correct;
       }
 
-      await prisma.user.update({
-        where: { id: session.user.id },
+      // await prisma.user.update({
+      //   where: { id: session.user.id },
+      //   data: {
+      //     batteries: fetchedUser.batteries,
+      //   },
+      // });
+
+      // Update the battery in the database.
+      const updatedBattery = await prisma.battery.update({
+        where: { id: batteryId },
         data: {
-          batteries: fetchedUser.batteries,
+          answers: fetchedBattery.answers,
+          complete: fetchedBattery.complete,
+          correct: fetchedBattery.correct,
         },
       });
 
       // Return the grade in the response body.
       return res.status(200).json({
         correct: isComplete === true ? correct : -1,
-        possible: fetchedBattery.questions.length,
+        possible: updatedBattery.questions.length,
         percent:
           isComplete === true
-            ? (correct / fetchedBattery.questions.length) * 100
+            ? (correct / updatedBattery.questions.length) * 100
             : -1,
         complete: isComplete,
       });

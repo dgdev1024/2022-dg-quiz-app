@@ -139,7 +139,7 @@ const methods = {
 
       // Return the posted quiz's ID in the response body.
       return res.status(201).json({
-        id: postedQuiz.id,
+        quiz: { id: postedQuiz.id },
       });
     } catch (err) {
       console.error(`POST /api/quiz: ${err}`);
@@ -261,8 +261,6 @@ const methods = {
         });
       }
 
-      console.log(editedQuiz.questions);
-
       // Update the quiz and questions in the database.
       const updatedQuiz = await prisma.quiz.update({
         where: { id: quizId },
@@ -281,7 +279,7 @@ const methods = {
       });
 
       // Return the updated quiz's ID in the response body.
-      return res.status(200).json({ id: updatedQuiz.id });
+      return res.status(200).json({ quiz: { id: updatedQuiz.id } });
     } catch (err) {
       console.error(`PUT /api/quiz: ${err}`);
       return res

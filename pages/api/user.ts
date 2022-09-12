@@ -7,7 +7,11 @@ import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "./auth/[...nextauth]";
 import { prisma } from "@lib/prisma";
 import { cloudinary } from "@lib/cloudinary";
-import { UserUpdateData } from "types/quiz-app-types";
+import {
+  GetUserResponseBody,
+  PutUserResponseBody,
+  UserUpdateData,
+} from "types/quiz-app-types";
 
 /**
  * If, while updating the user's details, an image data URL is provided to update their
@@ -33,7 +37,7 @@ const uploadDataUrl = async (url: string, emailAddress: string) => {
 };
 
 const methods = {
-  async get(req: NextApiRequest, res: NextApiResponse<any>) {
+  async get(req: NextApiRequest, res: NextApiResponse<GetUserResponseBody>) {
     // Make sure the user accessing this endpoint is logged in.
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
@@ -48,7 +52,6 @@ const methods = {
       // Fetch the user with the given ID from the database.
       const getUser = await prisma.user.findUnique({
         where: { id: userId },
-        include: { quizzes: true },
       });
 
       // Report if the user could not be found.
@@ -56,42 +59,22 @@ const methods = {
         return res.status(404).json({ error: "No user exists with this ID." });
       }
 
-      // If the user being fetched is the logged-in user, then calculate their grade
-      // based on their completed quiz batteries.
+      // Check to see if the user being fetched is the currently logged-in user.
       const isSelf = getUser.id === session.user.id;
-      let completedBatteriesCount: number = 0;
-      let currentGrade: number = 0;
-      if (isSelf === true) {
-        const completedBatteries = getUser.batteries.filter(
-          (battery) => battery.complete === true && battery.correct !== null
-        );
 
-        completedBatteriesCount = completedBatteries.length;
-        if (completedBatteriesCount > 0) {
-          currentGrade =
-            completedBatteries.reduce((correct, battery) => {
-              if (battery.correct === null) {
-                return correct;
-              }
-
-              return correct + battery.correct;
-            }, 0) / completedBatteriesCount;
-        }
-      }
-
-      // Return the user's details and quizzes in the response.
-      return res.status(200).json({
+      // Construct the User response object to be returned.
+      const returnedResponse: GetUserResponseBody = {
         user: {
           id: getUser.id,
-          name: getUser.name,
-          image: getUser.image,
+          name: getUser.name || "",
+          image: getUser.image || "",
           emailAddress: getUser.email,
-          quizzes: getUser.quizzes.slice(10),
-          completedBatteriesCount: isSelf && completedBatteriesCount,
-          currentGrade: isSelf && currentGrade,
           isSelf,
         },
-      });
+      };
+
+      // Return the user's details and quizzes in the response.
+      return res.status(200).json(returnedResponse);
     } catch (err) {
       console.error(`GET /api/user: ${err}`);
       return res
@@ -99,7 +82,7 @@ const methods = {
         .json({ error: "Something went wrong. Try again later." });
     }
   },
-  async put(req: NextApiRequest, res: NextApiResponse<any>) {
+  async put(req: NextApiRequest, res: NextApiResponse<PutUserResponseBody>) {
     // Make sure the user accessing this endpoint is logged in.
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
@@ -129,7 +112,6 @@ const methods = {
       // Update the user's record in the database with the new information.
       const updateUser = await prisma.user.update({
         where: { id: session.user.id },
-        include: { quizzes: true },
         data: updateData,
       });
 
@@ -137,10 +119,9 @@ const methods = {
       return res.status(200).json({
         user: {
           id: updateUser.id,
-          name: updateUser.name,
-          image: updateUser.image,
+          name: updateUser.name || "",
+          image: updateUser.image || "",
           emailAddress: updateUser.email,
-          quizzes: updateUser.quizzes.slice(10),
           isSelf: updateUser.id === session.user.id,
         },
       });

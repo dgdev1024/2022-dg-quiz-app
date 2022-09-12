@@ -23,14 +23,18 @@ type BatteryQuestion {
   choices   Int[]
 }
 
-type Battery {
-  id            String
+model Battery {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   quizId        String
   quizVersion   Int
   questions     BatteryQuestion[]
   answers       Int[]
   complete      Boolean       @default(false)
   correct       Int?
+
+  @@map("batteries")
 }
 
 type QuizQuestion {
@@ -97,7 +101,7 @@ model Session {
 model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
-  email         String?   @unique
+  email         String    @unique
   emailVerified DateTime?
   image         String?
   accounts      Account[]

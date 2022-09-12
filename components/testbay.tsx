@@ -52,7 +52,7 @@ const Testbay = () => {
 
   const onGetClicked = async () => {
     if (postResponse) {
-      const res = await fetch(`api/quiz?id=${postResponse.id}`);
+      const res = await fetch(`api/quiz?id=${postResponse.quiz?.id}`);
       const data = await res.json();
 
       setGetResponse(data);
@@ -61,7 +61,7 @@ const Testbay = () => {
 
   const onPutClicked = async () => {
     if (postResponse) {
-      const res = await fetch(`/api/quiz?id=${postResponse.id}`, {
+      const res = await fetch(`/api/quiz?id=${postResponse.quiz?.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(TestPutQuizBody),
@@ -74,7 +74,7 @@ const Testbay = () => {
 
   const onDeleteClicked = async () => {
     if (postResponse) {
-      const res = await fetch(`/api/quiz?id=${postResponse.id}`, {
+      const res = await fetch(`/api/quiz?id=${postResponse.quiz?.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -91,7 +91,7 @@ const Testbay = () => {
   };
 
   const onRequestBatteryClicked = async () => {
-    const res = await fetch(`/api/battery?id=${postResponse?.id}`, {
+    const res = await fetch(`/api/battery?id=${postResponse?.quiz?.id}`, {
       method: "POST",
     });
     const data = await res.json();
@@ -100,18 +100,23 @@ const Testbay = () => {
   };
 
   const onResolveBatteryClicked = async () => {
-    const res = await fetch(`/api/battery?id=${requestBatteryResponse?.id}`);
+    const res = await fetch(
+      `/api/battery?id=${requestBatteryResponse?.battery?.id}`
+    );
     const data = await res.json();
 
     setResolveBatteryResponse(data);
   };
 
   const onSubmitBatteryClicked = async () => {
-    const res = await fetch(`/api/battery?id=${requestBatteryResponse?.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(TestSubmitBatteryBody),
-    });
+    const res = await fetch(
+      `/api/battery?id=${requestBatteryResponse?.battery?.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(TestSubmitBatteryBody),
+      }
+    );
     const data = await res.json();
 
     setSubmitBatteryResponse(data);

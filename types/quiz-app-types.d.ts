@@ -2,6 +2,8 @@
  * @file types/quiz-app-types.d.ts
  */
 
+import { Quiz } from "@prisma/client";
+
 /** The type of the data used to update the logged-in user. */
 export type UserUpdateData = {
   name?: string;
@@ -19,6 +21,16 @@ export type QuizQuestion = {
 export type BatteryQuestion = {
   id: string;
   choices: number[];
+};
+
+/** The type of the newly-generated battery returned by 'generateQuizBattery' */
+export type GeneratedBattery = {
+  quizId: string;
+  quizVersion: number;
+  questions: BatteryQuestion[];
+  answers: number[];
+  complete: boolean;
+  correct: number;
 };
 
 /** The type of the request body used by the POST method function. */
@@ -65,7 +77,9 @@ export type GetQuizResponseBody = {
 
 /** The type of the response returned by the POST method function. */
 export type PostQuizResponseBody = {
-  id?: string;
+  quiz?: {
+    id: string;
+  };
   error?: string;
   issues?: string[];
 };
@@ -103,47 +117,77 @@ export type SubmitBatteryRequestBody = {
   answers: number[];
 };
 
+/** The type of the response returned by GET /api/user. */
+export type GetUserResponseBody = {
+  error?: string;
+  user?: {
+    id: string;
+    name: string;
+    image: string;
+    emailAddress: string;
+    isSelf: boolean;
+  };
+};
+
+/** The type of the response returned by PUT /api/user */
+export type PutUserResponseBody = {
+  error?: string;
+  user?: {
+    id: string;
+    name: string;
+    image: string;
+    emailAddress: string;
+    isSelf: boolean;
+  };
+};
+
 /**
  * The type of the response returned by GET /api/search.
  */
 export type SearchQuizResponseBody = {
-  quizzes?: {
-    name: string;
-    description: string;
-    authorId: string;
-    authorName: string;
-    dateCreated: Date;
-    dateUpdated: Date;
-    dateOpens: Date;
-    dateCloses: Date | null | undefined;
-  }[];
-  page?: number;
-  lastPage?: boolean;
+  results?: {
+    quizzes: {
+      name: string;
+      description: string;
+      authorId: string;
+      authorName: string;
+      dateCreated: Date;
+      dateUpdated: Date;
+      dateOpens: Date;
+      dateCloses: Date | null | undefined;
+    }[];
+    page: number;
+    lastPage: boolean;
+  };
   error?: string;
 };
 
 /** The type of the response body returned by POST /api/battery. */
 export type RequestBatteryResponseBody = {
-  id?: string;
-  quizId?: string;
-  quizVersion?: number;
-  questions?: BatteryQuestion[];
-  complete?: boolean;
-  correct?: number;
+  battery?: {
+    id: string;
+    quizId: string;
+    quizVersion: number;
+    questions: BatteryQuestion[];
+    complete: boolean;
+    correct?: number;
+  };
   error?: string;
 };
 
 /** The type of the response body returned by GET /api/battery. */
 export type ResolveBatteryResponseBody = {
+  battery?: {
+    name: string;
+    description: string;
+    questions: QuizQuestion[];
+    answers: number[];
+    outdated: boolean;
+    complete: boolean;
+    correct: number;
+    open: boolean;
+  };
   error?: string;
-  name?: string;
-  description?: string;
-  questions?: QuizQuestion[];
-  answers?: number[];
-  outdated?: boolean;
-  complete?: boolean;
-  correct?: number;
-  open?: boolean;
 };
 
 /** The type of the response body returned by PUT /api/battery */

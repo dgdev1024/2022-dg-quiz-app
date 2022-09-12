@@ -82,19 +82,21 @@ export default async (
 
     // Return the fetched quizzes in the response.
     return res.status(200).json({
-      quizzes: fetchedQuizzes.map((quiz) => ({
-        name: quiz.name,
-        description: quiz.description,
-        authorId: quiz.authorId,
-        authorName: quiz.author.name as string,
-        authorEmail: quiz.author.email as string,
-        dateCreated: quiz.dateCreated,
-        dateUpdated: quiz.dateUpdated,
-        dateOpens: quiz.dateOpens,
-        dateCloses: quiz.dateCloses,
-      })),
-      page: page,
-      lastPage: fetchedQuizzes.length < quizzesPerPage + 1,
+      results: {
+        quizzes: fetchedQuizzes.map((quiz) => ({
+          name: quiz.name,
+          description: quiz.description,
+          authorId: quiz.authorId,
+          authorName: quiz.author.name as string,
+          authorEmail: quiz.author.email as string,
+          dateCreated: quiz.dateCreated,
+          dateUpdated: quiz.dateUpdated,
+          dateOpens: quiz.dateOpens,
+          dateCloses: quiz.dateCloses,
+        })),
+        page: page,
+        lastPage: fetchedQuizzes.length < quizzesPerPage + 1,
+      },
     });
   } catch (err) {
     console.error(`GET /api/search: ${err}`);
